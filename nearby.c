@@ -14,6 +14,7 @@
 // you should have an array of topics and an array of questions
 
 struct Topic{
+	double distance;
 	int id;
 	double x;
 	double y;
@@ -31,7 +32,9 @@ int binary_search(int* ids, int id, double* values, double value, int min_index,
 void insert_and_shift(int index, double value, int** array_ptr, int length);
 int mid_point(int min_index, int max_index);
 double best_topic_value(int* children, int num_children, double x, double y, double** valuesT_ptr, struct Topic** topics_ptr);
-
+int comp_topics(struct Topic topic1, struct Topic topic2);
+int qselect(struct Topic** v_ptr, int start, int len, int k);
+int comp_topics_qsort(void* e1, void* e2);
 
 int main(int argc, char** argv){
 	char* line = getLine(stdin);
@@ -82,28 +85,18 @@ int main(int argc, char** argv){
 		double y = strtod(where_end+1, &where_end);
 		int index;
 		if (type == 't'){
-			if (T < num_queries)
-				num_queries = T;
+			// first you need to go through the entire array
+			// then you need to sort them
 			for (int i = 0; i < T; i++){
-				double value = sqrt(pow(x-topics[i].x, 2)+pow(y-topics[i].y, 2)); 
-				valuesT[i] = value;
-				int id = topics[i].id;
-				int length = num_queries;
-				int one_more = 0;
-				if (i < num_queries){
-					length = i;
-					one_more = 1;
-				}
-				index = binary_search(ids, id, valuesT, value, 0, length-1);
-				insert_and_shift(index, id, &ids, length+one_more);
+				topics[i].distance = sqrt(pow(x-topics[i].x, 2)+pow(y-topics[i].y, 2));
 			}
-			for (int i = 0; i < num_queries; i++){
-				if (i != num_queries-1)
-					printf("%d ", ids[i]);
-				else
-					printf("%d", ids[i]);
+			int num = 10;
+			qselect(&topics, 0, T, num);
+			for (int i = 0; i < num+2; i++){
+				printf("%f\n", topics[i].distance);
 			}
-			printf("\n");
+			return 0;
+			//qsort(&topics, T, sizeof(struct Topic), topic_comp);
 		} else {
 			reset(&valuesT, T);
 			if (Q-num_zero < num_queries)
@@ -206,4 +199,56 @@ double best_topic_value(int* children, int num_children, double x, double y, dou
 		}
 	}
 	return best;
+}
+
+// TRUE means that topic1 < topic2
+// 1 means topic1 < topic2
+int comp_topics(struct Topic topic1, struct Topic topic2){
+	double distance1 = topic1.distance;
+	double distance2 = topic2.distance;
+	if (abs(distance1-distance2) < 0.001){
+		if (topic1.id > topic2.id){
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+	} else {
+		if (distance1 < distance2){
+			return TRUE;
+		} else {
+			return FALSE;
+		}
+	}
+}
+
+int comp_topics_qsort(void* e1, void* e2)
+{
+	struct Topic topic1 = *((struct Topic*) e1);
+	struct Topic topic2 = *((struct Topic*) e2);
+	int to_return = comp_topics(topic1, topic2);
+	if (to_return){
+		return 1;
+	} else {
+		return -1;
+	}
+}
+
+int qselect(struct Topic** v_ptr, int start, int len, int k)
+{
+	struct Topic* v = *v_ptr+start;
+#	define SWAP(a, b) { tmp = v[a]; v[a] = v[b]; v[b] = tmp; }
+	int i, st;
+	struct Topic tmp;
+ 
+	for (st = i = 0; i < len - 1; i++) {
+		if (!comp_topics(v[i], v[len-1])) continue;	
+		SWAP(i, st);
+		st++;
+	}
+ 
+	SWAP(len-1, st);
+ 
+	return k == st	?0
+			:st > k	? qselect(v_ptr, start, st, k)
+				: qselect(v_ptr, start + st, len - st, k - st);
 }
