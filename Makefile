@@ -11,3 +11,6 @@ $(TARGET): $(OBJECTS)
 
 %.o: %.c
 	${CC} ${CFLAGS} -c $< -o $@
+
+random: random.c
+	${CC} ${CFLAGS} -o $@ $^
