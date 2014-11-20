@@ -27,6 +27,12 @@ struct Question{
 	double distance;
 };
 
+struct Square{
+	int num_children;
+	int max_children;
+	struct Topic* children;
+};
+
 
 void reset(double** values_ptr, int length);
 int binary_search(int* ids, int id, double* values, double value, int min_index, int max_index);
@@ -39,6 +45,8 @@ int comp_topics_qsort(const void* e1, const void* e2);
 int comp_questions_qsort(const void* e1, const void* e2);
 int qselect_questions(struct Question** v_ptr, int start, int len, int k);
 int comp_questions(struct Question question1, struct Question question2);
+void insert_topic(struct Square*** topics_grid_ptr, int id, double x, double y);
+void add_topics(struct Square*** topics_grid_ptr, struct Topic** topics_ptr, int* topics_index_ptr, int x_index, int y_index, int size);
 
 
 #define MAX_DISTANCE sqrt(2)*1000000.0 + 1.0;
@@ -52,21 +60,49 @@ int main(int argc, char** argv){
 	T = strtol(line, &where_end, 10);
 	Q = strtol(where_end+1, &where_end, 10);
 	N = strtol(where_end+1, &where_end, 10);
+	struct Square** topics_grid = malloc(20*sizeof(struct Square*));
+	int MAX_CHILDREN = 32;
+	for (int i = 0; i < 20; i++){
+		topics_grid[i] = malloc(20*sizeof(struct Square));
+		for (int j = 0; j < 20; j++){
+			struct Square square = topics_grid[i][j];
+			square.num_children = 0;
+			square.max_children = MAX_CHILDREN;
+			square.children = malloc(MAX_CHILDREN*sizeof(struct Topic));
+			topics_grid[i][j] = square;
+		}
+	}
+
 	struct Topic* topics = malloc(T*sizeof(struct Topic));
 	struct Question* questions = malloc(Q*sizeof(struct Question));
 	free(line);
+	int id;
+	double x;
+	double y;
 	for (int i = 0; i < T; i++){
 		line = getLine(stdin);
-		struct Topic new_topic = topics[i];
-		new_topic.id = strtol(line, &where_end, 10);
-		new_topic.x = strtod(where_end+1, &where_end);
-		new_topic.y = strtod(where_end+1, &where_end);
-		topics[i] = new_topic;
+		id = strtol(line, &where_end, 10);
+		x = strtod(where_end+1, &where_end);
+		y = strtod(where_end+1, &where_end);
+		insert_topic(&topics_grid, id, x, y);
 		free(line);
 	}
+	/*
+	for (int i = 0; i < 20; i++){
+		for (int j = 0; j < 20; j++){
+			struct Square square = topics_grid[i][j];
+			int num_children = square.num_children;
+			for (int k = 0; k < num_children; k++){
+				printf("%d ", square.children[k].id);
+			}
+			printf("\n");
+		}
+	}
+	*/
 	int num_zero = 0;
 	for (int i = 0; i < Q; i++){
 		line = getLine(stdin);
+		/*
 		struct Question new_question = questions[i];
 		new_question.id = strtol(line, &where_end, 10);
 		int num_topics = strtol(where_end+1, &where_end, 10);
@@ -79,6 +115,7 @@ int main(int argc, char** argv){
 		}
 		new_question.topics = q_topics;
 		questions[i] = new_question;
+		*/
 		free(line);
 	}
 	double* valuesT = malloc(T*sizeof(double));
@@ -92,6 +129,7 @@ int main(int argc, char** argv){
 		double y = strtod(where_end+1, &where_end);
 		int index;
 		if (type == 't'){
+			/*
 			// first you need to go through the entire array
 			// then you need to sort them
 			for (int i = 0; i < T; i++){
@@ -104,7 +142,31 @@ int main(int argc, char** argv){
 			}
 			printf("\n");
 			//qsort(&topics, T, sizeof(struct Topic), topic_comp);
-		} else {
+			*/
+
+			int x_index = (int)floor(x)/5;
+			int y_index = (int)floor(y)/5;
+			struct Square square = topics_grid[x_index][y_index];
+			int how_many = square.num_children;
+			memcpy(topics, square.children, sizeof(struct Topic)*how_many);
+
+			int size = 1;
+			while (how_many < num_queries){
+				add_topics(&topics_grid, &topics, &how_many, x_index, y_index, size);
+				size += 1;
+			}
+			for (int i = 0; i < how_many; i++){
+				topics[i].distance = sqrt(pow(x-topics[i].x, 2)+pow(y-topics[i].y, 2));
+			}
+			qsort(topics, how_many, sizeof(struct Topic), comp_topics_qsort);
+			for (int i = 0; i < num_queries; i++){
+				printf("%d ", topics[i].id);
+			}
+			printf("\n");
+			
+		} 
+		/*
+		else {
 			for (int i = 0; i < Q; i++){
 				questions[i].distance = best_topic_value(questions[i].topics, questions[i].num_topics, x, y, &topics);
 			}
@@ -115,10 +177,9 @@ int main(int argc, char** argv){
 			}
 			printf("\n");
 		}
+		*/
 		free(line);
 	}
-
-
 	// printf("T: %d\nQ: %d\nN: %d\n", T, Q, N)
 	return 0;
 }
@@ -294,3 +355,71 @@ int comp_questions_qsort(const void* e1, const void* e2)
 		return 1;
 	}
 }
+
+void insert_topic(struct Square*** topics_grid_ptr, int id, double x, double y){
+	struct Square** topics_grid = *topics_grid_ptr;
+	int x_index = (int)floor(x)/5;
+	int y_index = (int)floor(y)/5;
+	struct Square square = topics_grid[x_index][y_index];
+	int num_children = square.num_children;
+	int max_children = square.max_children;
+	if (num_children == max_children){
+		square.children = realloc(square.children, sizeof(struct Topic)*2*max_children);
+		square.max_children *= 2;
+	}
+	struct Topic topic = square.children[num_children];
+	topic.id = id;
+	topic.x = x;
+	topic.y = y;
+	square.children[num_children] = topic;
+	square.num_children += 1;
+	topics_grid[x_index][y_index] = square;
+}
+
+void add_topics(struct Square*** topics_grid_ptr, struct Topic** topics_ptr, int* topics_index_ptr, int x_index, int y_index, int size)
+{
+	struct Square** topics_grid = *topics_grid_ptr;
+	struct Topic* topics = *topics_ptr;
+	int topics_index = *topics_index_ptr;
+	int i = -size;
+	int j = -size;
+	for (j += 1; j <= size; j++){
+		if (x_index+i < 0 || x_index+i >= 20 || y_index+j < 0 || y_index+j >= 20){
+			continue;
+		}
+		struct Square square = topics_grid[x_index+i][y_index+j];
+		int num_children = square.num_children;
+		memcpy(topics+topics_index, square.children, sizeof(struct Topic)*num_children);
+		topics_index += num_children;
+	}
+	for (i += 1; i <= size; i++){
+		if (x_index+i < 0 || x_index+i >= 20 || y_index+j < 0 || y_index+j >= 20){
+			continue;
+		}
+		struct Square square = topics_grid[x_index+i][y_index+j];
+		int num_children = square.num_children;
+		memcpy(topics+topics_index, square.children, sizeof(struct Topic)*num_children);
+		topics_index += num_children;
+	}
+	for(j -= 1; j >= -size; j--){
+		if (x_index+i < 0 || x_index+i >= 20 || y_index+j < 0 || y_index+j >= 20){
+			continue;
+		}
+		struct Square square = topics_grid[x_index+i][y_index+j];
+		int num_children = square.num_children;
+		memcpy(topics+topics_index, square.children, sizeof(struct Topic)*num_children);
+		topics_index += num_children;
+	}
+	for (i -= 1; i >= -size; i--){
+		if (x_index+i < 0 || x_index+i >= 20 || y_index+j < 0 || y_index+j >= 20){
+			continue;
+		}
+		struct Square square = topics_grid[x_index+i][y_index+j];
+		int num_children = square.num_children;
+		memcpy(topics+topics_index, square.children, sizeof(struct Topic)*num_children);
+		topics_index += num_children;
+	}
+	*topics_index_ptr = topics_index;
+}
+
+		
